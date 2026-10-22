@@ -1,0 +1,392 @@
+{% extends "base.html" %}
+{% block titulo %}Vender · Abarrotes La Esquina{% endblock %}
+{% block header_titulo %}Vender{% endblock %}
+{% block contenido %}
+<div class="flex flex-col w-full px-gutter pt-16 pb-72">
+<div class="mb-4">
+<div class="relative flex items-center">
+<span class="material-symbols-outlined absolute left-4 text-outline">search</span>
+<input class="w-full h-12 pl-12 pr-4 bg-surface-container-low text-on-surface placeholder:text-outline rounded-xl text-body-md focus:outline-none focus:ring-2 focus:ring-primary transition-all" id="product-search" oninput="filterProducts(this.value)" placeholder="Buscar producto..." type="text"/>
+</div>
+</div>
+<div class="hidden flex flex-col items-center justify-center py-10 px-4 text-center bg-surface-container-low rounded-xl mb-4" id="empty-search-state">
+<div class="w-12 h-12 rounded-full bg-primary-fixed flex items-center justify-center mb-3 text-primary">
+<span class="material-symbols-outlined">inventory_2</span>
+</div>
+<h3 class="text-headline-sm text-on-surface mb-1">Producto no encontrado</h3>
+<p class="text-body-sm text-on-surface-variant mb-4">¿No está en el inventario actual?</p>
+<a class="text-primary font-medium text-label-md flex items-center gap-1 hover:underline" href="/inventario">
+<span class="material-symbols-outlined text-[18px]">add_circle</span>
++ agregar este producto
+</a>
+</div>
+<div class="flex flex-col gap-3" id="products-list"></div>
+</div>
+
+<!-- Lista + barra fija -->
+<div class="fixed bottom-20 inset-x-0 z-40 bg-surface-container-lowest/95 backdrop-blur-md shadow-lg border-t border-surface-container">
+<div class="px-4" id="lista-wrap">
+<div class="flex-col py-2" id="lista-panel">
+<div class="flex items-center justify-between pb-1">
+<div class="flex items-center gap-2 min-w-0">
+<span class="text-label-lg font-medium text-on-surface truncate" id="lista-titulo">Lista 1</span>
+<span class="text-label-sm text-on-surface-variant shrink-0" id="lista-count">0 art.</span>
+</div>
+<div class="flex items-center gap-1 shrink-0">
+<button class="h-8 px-2 rounded-lg text-label-sm font-medium text-error flex items-center gap-1 active:scale-95 transition-transform" id="btn-vaciar" type="button">
+<span class="material-symbols-outlined text-[18px]">delete_sweep</span>
+Vaciar lista
+</button>
+<button class="w-8 h-8 rounded-full bg-surface-container text-on-surface flex items-center justify-center active:scale-95 transition-transform" id="btn-plegar" type="button" title="Plegar lista">
+<span class="material-symbols-outlined text-[20px]" id="plegar-icono">expand_more</span>
+</button>
+</div>
+</div>
+<div class="flex-col overflow-y-auto" id="lista-scroll" style="max-height:30vh;">
+<div class="flex flex-col gap-1 pb-1" id="lista-items"></div>
+</div>
+<div class="text-label-sm text-on-surface-variant text-center py-2" id="lista-vacia">Aún no hay productos en la lista.</div>
+</div>
+</div>
+<div class="px-4 py-3 border-t border-surface-container">
+<div class="flex items-end justify-between gap-3 mb-2">
+<div class="flex items-baseline gap-1">
+<span class="text-body-sm text-on-surface-variant">Total:</span>
+<span class="text-headline-lg font-headline text-on-surface" id="cart-total">C$0.00</span>
+</div>
+<span class="text-label-sm text-secondary font-medium" id="cart-profit">ganancia C$0.00</span>
+</div>
+<div class="flex items-center gap-3">
+<button class="flex-1 h-12 bg-surface-container-high text-on-surface rounded-xl font-label-lg flex items-center justify-center gap-2 active:scale-95 transition-all disabled:opacity-50" id="btn-imprimir" type="button">
+<span class="material-symbols-outlined text-[20px]">print</span>
+Imprimir
+</button>
+<button class="flex-1 h-12 bg-primary text-on-primary rounded-xl font-label-lg flex items-center justify-center gap-2 shadow-sm active:scale-95 transition-all disabled:opacity-50" id="btn-cobrar" type="button">
+<span class="material-symbols-outlined text-[20px]">payments</span>
+Cobrar
+</button>
+</div>
+</div>
+</div>
+
+<div class="fixed inset-x-4 top-20 z-50 transform -translate-y-24 opacity-0 pointer-events-none transition-all duration-300" id="toast-confirmation">
+<div class="p-4 rounded-xl shadow-xl flex items-center gap-3" id="toast-card">
+<div class="w-8 h-8 rounded-full flex items-center justify-center shrink-0" id="toast-badge">
+<span class="material-symbols-outlined text-[20px]" id="toast-icon">check</span>
+</div>
+<div class="flex flex-col flex-grow">
+<span class="text-label-lg font-medium" id="toast-title">¡Cobro exitoso!</span>
+<span class="text-body-sm opacity-90" id="toast-sub">Transacción registrada correctamente.</span>
+</div>
+</div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+var productos = [];
+var cantidades = {};
+var enviando = false;
+var numeroVenta = 1;
+var listaPlegada = false;
+
+function unidadTxt(cantidad, unidad) {
+var u = (unidad || "").toString().trim();
+var n = Number(cantidad);
+if (!u) return corto(n);
+var plural = u;
+if (n !== 1 && !/s$/i.test(u)) {
+if (/^unidad$/i.test(u)) plural = "unidades";
+else if (/^libra$/i.test(u)) plural = "libras";
+else if (/^litro$/i.test(u)) plural = "litros";
+else if (/^bolsa$/i.test(u)) plural = "bolsas";
+else plural = u + "s";
+}
+return corto(n) + " " + plural;
+}
+
+function showToastTop(titulo, subtitulo, esError) {
+var wrap = document.getElementById("toast-confirmation");
+var card = document.getElementById("toast-card");
+var badge = document.getElementById("toast-badge");
+card.className = "p-4 rounded-xl shadow-xl flex items-center gap-3 " + (esError ? "bg-error text-on-error" : "bg-secondary text-on-secondary");
+badge.className = "w-8 h-8 rounded-full flex items-center justify-center shrink-0 " + (esError ? "bg-on-error/20" : "bg-on-secondary/20");
+document.getElementById("toast-icon").textContent = esError ? "error" : "check";
+document.getElementById("toast-title").textContent = titulo;
+document.getElementById("toast-sub").textContent = subtitulo || "";
+wrap.classList.remove("-translate-y-24", "opacity-0", "pointer-events-none");
+clearTimeout(window._toastTop);
+window._toastTop = setTimeout(function() {
+wrap.classList.add("-translate-y-24", "opacity-0", "pointer-events-none");
+}, 2500);
+}
+
+function renderProductos() {
+var cont = document.getElementById("products-list");
+cont.innerHTML = "";
+if (!productos.length) {
+cont.innerHTML = '<div class="py-10 text-center text-body-sm text-on-surface-variant bg-surface-container-low rounded-xl">No hay productos en el inventario.</div>';
+return;
+}
+productos.forEach(function(p) {
+var gana = Number(p.price) - Number(p.cost);
+var unidad = (p.unit || "").toString().trim();
+var precioTxt = dinero(p.price) + (unidad ? ' <span class="text-body-sm text-on-surface-variant">/ ' + escapeHtml(unidad) + "</span>" : "");
+var card = document.createElement("div");
+card.className = "product-card bg-surface-container-lowest p-4 rounded-xl flex items-center justify-between shadow-sm transition-all";
+card.setAttribute("data-name", p.name.toLowerCase());
+card.innerHTML =
+'<div class="flex flex-col min-w-0 pr-3">' +
+'<span class="text-headline-sm text-on-surface truncate">' + escapeHtml(p.name) + "</span>" +
+'<div class="flex items-center gap-2 mt-1">' +
+'<span class="text-body-md font-medium text-on-surface">' + precioTxt + "</span>" +
+'<span class="text-label-sm text-secondary bg-secondary-container/30 px-2 py-0.5 rounded-full">gana C$' + corto(gana) + "</span>" +
+"</div>" +
+"</div>" +
+'<div class="flex items-center gap-3 shrink-0">' +
+'<button class="w-10 h-10 rounded-full bg-surface-container-low text-on-surface flex items-center justify-center active:scale-95 transition-transform" data-id="' + p.id + '" data-delta="-1" type="button">' +
+'<span class="material-symbols-outlined text-[20px]">remove</span>' +
+"</button>" +
+'<span class="text-headline-sm w-6 text-center" id="qty-' + p.id + '">0</span>' +
+'<button class="w-10 h-10 rounded-full bg-primary text-on-primary flex items-center justify-center active:scale-95 transition-transform shadow-sm" data-id="' + p.id + '" data-delta="1" type="button">' +
+'<span class="material-symbols-outlined text-[20px]">add</span>' +
+"</button>" +
+"</div>";
+cont.appendChild(card);
+});
+cont.querySelectorAll("button[data-delta]").forEach(function(b) {
+b.addEventListener("click", function() {
+updateQty(b.dataset.id, Number(b.dataset.delta));
+});
+});
+updateTotals();
+}
+
+function updateQty(id, cambio) {
+cantidades[id] = Math.max(0, (cantidades[id] || 0) + cambio);
+var el = document.getElementById("qty-" + id);
+if (el) el.innerText = corto(cantidades[id]);
+updateTotals();
+}
+
+function quitar(id) {
+cantidades[id] = 0;
+var el = document.getElementById("qty-" + id);
+if (el) el.innerText = "0";
+updateTotals();
+}
+
+function editarCantidad(id) {
+var p = productos.find(function(x) { return x.id === id; });
+if (!p) return;
+var actual = cantidades[id] || 0;
+var respuesta = prompt("Cantidad de " + p.name + (p.unit ? " (" + p.unit + ")" : "") + ":", corto(actual));
+if (respuesta === null) return;
+var n = Number(respuesta.replace(",", "."));
+if (!Number.isFinite(n) || n < 0) {
+showToastTop("Cantidad inválida", "Ingresa un número mayor o igual a cero.", true);
+return;
+}
+cantidades[id] = Math.round(n * 1000) / 1000;
+var el = document.getElementById("qty-" + id);
+if (el) el.innerText = corto(cantidades[id]);
+updateTotals();
+}
+
+function renderLista() {
+var cont = document.getElementById("lista-items");
+var vacia = document.getElementById("lista-vacia");
+var count = document.getElementById("lista-count");
+cont.innerHTML = "";
+var agregados = productos.filter(function(p) { return (cantidades[p.id] || 0) > 0; });
+document.getElementById("lista-titulo").textContent = "Lista " + numeroVenta;
+var totalArt = agregados.length;
+count.textContent = totalArt + (totalArt === 1 ? " art." : " art.");
+if (!agregados.length) {
+vacia.classList.remove("hidden");
+cont.classList.add("hidden");
+return;
+}
+vacia.classList.add("hidden");
+cont.classList.remove("hidden");
+agregados.forEach(function(p) {
+var q = cantidades[p.id] || 0;
+var subtotal = Number(p.price) * q;
+var fila = document.createElement("div");
+fila.className = "flex items-center gap-2 bg-surface-container-low rounded-lg px-3 py-2 cursor-pointer active:bg-surface-container";
+fila.setAttribute("data-fila", p.id);
+fila.innerHTML =
+'<div class="flex flex-col min-w-0 flex-grow">' +
+'<span class="text-label-lg font-medium text-on-surface truncate">' + escapeHtml(p.name) + " · " + unidadTxt(q, p.unit) + " · " + dinero(subtotal) + "</span>" +
+'<span class="text-label-sm text-on-surface-variant">' + dinero(p.price) + (p.unit ? " / " + escapeHtml(p.unit) : "") + " c/u</span>" +
+"</div>" +
+'<div class="flex items-center gap-1 shrink-0">' +
+'<button class="w-8 h-8 rounded-full bg-surface text-on-surface flex items-center justify-center active:scale-95 transition-transform" data-lid="' + p.id + '" data-ldelta="-1" type="button">' +
+'<span class="material-symbols-outlined text-[18px]">remove</span>' +
+"</button>" +
+'<span class="text-body-md w-6 text-center">' + corto(q) + "</span>" +
+'<button class="w-8 h-8 rounded-full bg-surface text-on-surface flex items-center justify-center active:scale-95 transition-transform" data-lid="' + p.id + '" data-ldelta="1" type="button">' +
+'<span class="material-symbols-outlined text-[18px]">add</span>' +
+"</button>" +
+'<button class="w-8 h-8 rounded-full bg-error-container text-on-error-container flex items-center justify-center active:scale-95 transition-transform ml-1" data-quitar="' + p.id + '" type="button" title="Quitar">' +
+'<span class="material-symbols-outlined text-[18px]">close</span>' +
+"</button>" +
+"</div>";
+cont.appendChild(fila);
+});
+cont.querySelectorAll("button[data-ldelta]").forEach(function(b) {
+b.addEventListener("click", function(ev) { ev.stopPropagation(); updateQty(b.dataset.lid, Number(b.dataset.ldelta)); });
+});
+cont.querySelectorAll("button[data-quitar]").forEach(function(b) {
+b.addEventListener("click", function(ev) { ev.stopPropagation(); quitar(b.dataset.quitar); });
+});
+cont.querySelectorAll("[data-fila]").forEach(function(f) {
+f.addEventListener("click", function() { editarCantidad(f.getAttribute("data-fila")); });
+});
+}
+
+function updateTotals() {
+var total = 0;
+var ganancia = 0;
+var hayItems = false;
+productos.forEach(function(p) {
+var q = cantidades[p.id] || 0;
+if (q > 0) hayItems = true;
+total += Number(p.price) * q;
+ganancia += (Number(p.price) - Number(p.cost)) * q;
+});
+document.getElementById("cart-total").innerText = dinero(total);
+document.getElementById("cart-profit").innerText = "ganancia " + dinero(ganancia);
+renderLista();
+var deshabilitar = !hayItems || enviando;
+document.getElementById("btn-cobrar").disabled = deshabilitar;
+document.getElementById("btn-imprimir").disabled = deshabilitar;
+document.getElementById("btn-vaciar").disabled = !hayItems || enviando;
+}
+
+function filterProducts(query) {
+var q = query.toLowerCase().trim();
+var cards = document.querySelectorAll(".product-card");
+var matches = 0;
+cards.forEach(function(card) {
+var name = card.getAttribute("data-name");
+if (name.includes(q)) {
+card.style.display = "flex";
+matches++;
+} else {
+card.style.display = "none";
+}
+});
+var emptyState = document.getElementById("empty-search-state");
+if (matches === 0 && q.length > 0) {
+emptyState.classList.remove("hidden");
+} else {
+emptyState.classList.add("hidden");
+}
+}
+
+async function cargarProductos() {
+try {
+productos = await api("/api/productos");
+} catch (e) {
+if (e.message !== "Sesion requerida") {
+showToastTop("Error al cargar productos", e.message, true);
+}
+return;
+}
+renderProductos();
+}
+
+async function cargarNumeroVenta() {
+try {
+var g = await api("/api/ganancias?rango=hoy");
+numeroVenta = (Number(g.cantidad_ventas) || 0) + 1;
+} catch (e) {
+numeroVenta = 1;
+}
+document.getElementById("lista-titulo").textContent = "Lista " + numeroVenta;
+}
+
+function toggleLista() {
+listaPlegada = !listaPlegada;
+document.getElementById("lista-scroll").style.display = listaPlegada ? "none" : "block";
+document.getElementById("lista-vacia").style.display = (listaPlegada || hayItems()) ? "none" : "block";
+document.getElementById("plegar-icono").textContent = listaPlegada ? "expand_less" : "expand_more";
+document.getElementById("btn-plegar").title = listaPlegada ? "Desplegar lista" : "Plegar lista";
+}
+
+function hayItems() {
+return productos.some(function(p) { return (cantidades[p.id] || 0) > 0; });
+}
+
+function vaciarLista() {
+if (!hayItems()) return;
+if (!confirm("¿Vaciar toda la lista? Se quitarán todos los productos.")) return;
+limpiarCarrito();
+}
+
+function armarCarrito() {
+var items = [];
+var lineas = [];
+productos.forEach(function(p) {
+var q = cantidades[p.id] || 0;
+if (q > 0) {
+items.push({ product_id: p.id, cantidad: String(q) });
+lineas.push({
+nombre: p.name,
+cantidad: q,
+unidad: p.unit || "",
+precio: Number(p.price),
+subtotal: Number(p.price) * q
+});
+}
+});
+return { items: items, lineas: lineas };
+}
+
+function limpiarCarrito() {
+productos.forEach(function(p) { cantidades[p.id] = 0; });
+document.querySelectorAll('[id^="qty-"]').forEach(function(el) { el.innerText = "0"; });
+updateTotals();
+}
+
+async function registrar(abrirRecibo) {
+if (enviando) return;
+var carro = armarCarrito();
+if (!carro.items.length) return;
+enviando = true;
+updateTotals();
+try {
+var venta = await api("/api/ventas", {
+method: "POST",
+headers: { "Content-Type": "application/json" },
+body: JSON.stringify({ items: carro.items })
+});
+if (abrirRecibo) {
+try {
+sessionStorage.setItem("recibo", JSON.stringify({ venta: venta, lineas: carro.lineas }));
+} catch (e) {}
+location.href = "/recibo";
+return;
+}
+mostrarToast("Venta guardada");
+limpiarCarrito();
+cargarNumeroVenta();
+cargarProductos();
+} catch (e) {
+if (e.message !== "Sesion requerida") {
+showToastTop("No se pudo cobrar", e.message, true);
+}
+} finally {
+enviando = false;
+updateTotals();
+}
+}
+
+document.getElementById("btn-cobrar").addEventListener("click", function() { registrar(false); });
+document.getElementById("btn-imprimir").addEventListener("click", function() { registrar(true); });
+document.getElementById("btn-vaciar").addEventListener("click", vaciarLista);
+document.getElementById("btn-plegar").addEventListener("click", toggleLista);
+cargarNumeroVenta();
+cargarProductos();
+</script>
+{% endblock %}

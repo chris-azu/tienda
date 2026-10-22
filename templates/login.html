@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block body_class %}bg-surface pt-safe pb-safe flex flex-col min-h-screen text-on-surface{% endblock %}
+{% block header %}{% endblock %}
+{% block nav %}{% endblock %}
+{% block titulo %}Abarrotes La Esquina{% endblock %}
+{% block contenido %}
+<div class="flex flex-col w-full p-4 space-y-6 max-w-md mx-auto">
+<div class="flex flex-col items-center text-center space-y-2 pt-2">
+<div class="w-16 h-16 rounded-full bg-primary-container flex items-center justify-center text-on-primary-container shadow-sm mb-1">
+<span class="material-symbols-outlined text-3xl" style="font-variation-settings: 'FILL' 1;">storefront</span>
+</div>
+<h1 class="font-headline-md text-headline-md text-on-surface">Abarrotes La Esquina</h1>
+<p class="font-body-md text-on-surface-variant">Digite su PIN de acceso</p>
+</div>
+<div class="bg-surface-container-low rounded-xl p-6 flex flex-col items-center justify-center space-y-4 shadow-sm">
+<div class="flex space-x-4">
+<div class="w-4 h-4 rounded-full bg-surface-container-high transition-all duration-200" id="dot-0"></div>
+<div class="w-4 h-4 rounded-full bg-surface-container-high transition-all duration-200" id="dot-1"></div>
+<div class="w-4 h-4 rounded-full bg-surface-container-high transition-all duration-200" id="dot-2"></div>
+<div class="w-4 h-4 rounded-full bg-surface-container-high transition-all duration-200" id="dot-3"></div>
+</div>
+<p class="font-label-sm text-outline h-4" id="pin-status-text">Ingrese 4 dígitos</p>
+</div>
+<div class="grid grid-cols-3 gap-3">
+<button class="h-16 rounded-xl bg-surface-container-low hover:bg-surface-container flex items-center justify-center text-on-surface font-headline-md text-headline-md active:scale-95 transition-all shadow-sm" onclick="pressKey('1')">1</button>
+<button class="h-16 rounded-xl bg-surface-container-low hover:bg-surface-container flex items-center justify-center text-on-surface font-headline-md text-headline-md active:scale-95 transition-all shadow-sm" onclick="pressKey('2')">2</button>
+<button class="h-16 rounded-xl bg-surface-container-low hover:bg-surface-container flex items-center justify-center text-on-surface font-headline-md text-headline-md active:scale-95 transition-all shadow-sm" onclick="pressKey('3')">3</button>
+<button class="h-16 rounded-xl bg-surface-container-low hover:bg-surface-container flex items-center justify-center text-on-surface font-headline-md text-headline-md active:scale-95 transition-all shadow-sm" onclick="pressKey('4')">4</button>
+<button class="h-16 rounded-xl bg-surface-container-low hover:bg-surface-container flex items-center justify-center text-on-surface font-headline-md text-headline-md active:scale-95 transition-all shadow-sm" onclick="pressKey('5')">5</button>
+<button class="h-16 rounded-xl bg-surface-container-low hover:bg-surface-container flex items-center justify-center text-on-surface font-headline-md text-headline-md active:scale-95 transition-all shadow-sm" onclick="pressKey('6')">6</button>
+<button class="h-16 rounded-xl bg-surface-container-low hover:bg-surface-container flex items-center justify-center text-on-surface font-headline-md text-headline-md active:scale-95 transition-all shadow-sm" onclick="pressKey('7')">7</button>
+<button class="h-16 rounded-xl bg-surface-container-low hover:bg-surface-container flex items-center justify-center text-on-surface font-headline-md text-headline-md active:scale-95 transition-all shadow-sm" onclick="pressKey('8')">8</button>
+<button class="h-16 rounded-xl bg-surface-container-low hover:bg-surface-container flex items-center justify-center text-on-surface font-headline-md text-headline-md active:scale-95 transition-all shadow-sm" onclick="pressKey('9')">9</button>
+<button class="h-16 rounded-xl bg-surface-container-low hover:bg-surface-container flex items-center justify-center text-on-surface-variant font-label-md active:scale-95 transition-all shadow-sm" onclick="clearPin()">
+<span class="material-symbols-outlined">backspace</span>
+</button>
+<button class="h-16 rounded-xl bg-surface-container-low hover:bg-surface-container flex items-center justify-center text-on-surface font-headline-md text-headline-md active:scale-95 transition-all shadow-sm" onclick="pressKey('0')">0</button>
+<button class="h-16 rounded-xl bg-primary-container text-on-primary-container hover:opacity-90 flex items-center justify-center active:scale-95 transition-all shadow-sm" onclick="submitPin()">
+<span class="material-symbols-outlined">check</span>
+</button>
+</div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+var currentPin = "";
+var enviando = false;
+
+function updateDots() {
+for (var i = 0; i < 4; i++) {
+var dot = document.getElementById("dot-" + i);
+if (i < currentPin.length) {
+dot.className = "w-4 h-4 rounded-full bg-primary transition-all duration-200 scale-110";
+} else {
+dot.className = "w-4 h-4 rounded-full bg-surface-container-high transition-all duration-200 scale-100";
+}
+}
+}
+
+function setStatus(texto, modo) {
+var el = document.getElementById("pin-status-text");
+el.textContent = texto;
+if (modo === "error") {
+el.className = "font-label-sm text-error h-4";
+} else if (modo === "ok") {
+el.className = "font-label-sm text-secondary h-4";
+} else {
+el.className = "font-label-sm text-outline h-4";
+}
+}
+
+function pressKey(num) {
+if (enviando || currentPin.length >= 4) return;
+currentPin += num;
+updateDots();
+if (currentPin.length === 4) {
+enviarPin();
+}
+}
+
+function clearPin() {
+if (enviando) return;
+currentPin = currentPin.slice(0, -1);
+updateDots();
+setStatus("Ingrese 4 dígitos", "");
+}
+
+function submitPin() {
+if (enviando) return;
+if (currentPin.length === 4) {
+enviarPin();
+} else {
+setStatus("Ingrese 4 dígitos", "error");
+}
+}
+
+async function enviarPin() {
+enviando = true;
+setStatus("Verificando PIN...", "ok");
+try {
+var r = await fetch("/auth/login", {
+method: "POST",
+headers: { "Content-Type": "application/json" },
+body: JSON.stringify({ pin: currentPin })
+});
+if (r.ok) {
+setStatus("¡PIN correcto! Entrando...", "ok");
+location.href = "/vender";
+return;
+}
+var detalle = "PIN incorrecto";
+try {
+var j = await r.json();
+if (j.detail) detalle = j.detail;
+} catch (e) {}
+setStatus(detalle, "error");
+currentPin = "";
+updateDots();
+} catch (e) {
+setStatus("Error de conexión", "error");
+currentPin = "";
+updateDots();
+} finally {
+enviando = false;
+}
+}
+</script>
+{% endblock %}

@@ -1,0 +1,464 @@
+{% extends "base.html" %}
+{% block titulo %}Inventario · Abarrotes La Esquina{% endblock %}
+{% block header_titulo %}Inventario{% endblock %}
+{% block contenido %}
+<div class="flex flex-col w-full px-gutter pt-16 pb-24 gap-4">
+<div class="flex items-center justify-between">
+<div class="flex flex-col">
+<h2 class="text-headline-md font-headline text-on-surface">Inventario</h2>
+<p class="text-body-sm text-on-surface-variant">Gestión rápida de abarrotes</p>
+</div>
+<button class="flex items-center gap-space-xs bg-primary text-on-primary px-4 py-2 rounded-xl font-label-md hover:bg-primary/90 transition-all shadow-sm" id="btn-nuevo" type="button">
+<span class="material-symbols-outlined text-[20px]">add</span>
+<span>Producto</span>
+</button>
+</div>
+<div class="hidden items-center justify-between bg-amber-500/10 p-4 rounded-xl border border-amber-500/20" id="alerta-stock">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-600">
+<span class="material-symbols-outlined">warning</span>
+</div>
+<div>
+<h4 class="text-label-lg text-on-surface font-semibold">Atención de stock</h4>
+<p class="text-body-sm text-on-surface-variant" id="alerta-texto">0 productos con stock bajo necesitan reposición</p>
+</div>
+</div>
+<button class="text-label-sm font-medium text-amber-700 bg-amber-500/20 px-3 py-1.5 rounded-lg hover:bg-amber-500/30 transition-all" id="btn-ver-bajos" type="button">
+Ver
+</button>
+</div>
+<div class="flex items-center gap-2 overflow-x-auto pb-1">
+<button class="flex items-center gap-space-xs px-4 py-2 rounded-full text-label-md font-medium transition-all bg-primary text-on-primary" id="chip-all" onclick="setFilter('all')" type="button">
+<span class="material-symbols-outlined text-[16px]">inventory_2</span>
+<span>Todos (0)</span>
+</button>
+<button class="flex items-center gap-space-xs px-4 py-2 rounded-full text-label-md font-medium transition-all bg-surface-container text-on-surface-variant hover:bg-surface-container-high" id="chip-low" onclick="setFilter('low')" type="button">
+<span class="material-symbols-outlined text-[16px]">error</span>
+<span>Stock bajo (0)</span>
+</button>
+<button class="flex items-center gap-space-xs px-4 py-2 rounded-full text-label-md font-medium transition-all bg-surface-container text-on-surface-variant hover:bg-surface-container-high" id="chip-ok" onclick="setFilter('ok')" type="button">
+<span class="material-symbols-outlined text-[16px]">check_circle</span>
+<span>Normal (0)</span>
+</button>
+</div>
+<div class="relative">
+<span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-outline">
+<span class="material-symbols-outlined text-[20px]">search</span>
+</span>
+<input class="w-full bg-surface-container-low pl-10 pr-4 py-3 rounded-xl text-body-md text-on-surface placeholder:text-outline outline-none focus:ring-2 focus:ring-primary/20 transition-all" id="searchInput" oninput="applyFilters()" placeholder="Buscar producto por nombre..." type="text"/>
+</div>
+<div class="flex flex-col gap-3" id="productList"></div>
+</div>
+<div class="fixed inset-0 z-50 bg-inverse-surface/40 backdrop-blur-sm hidden items-end justify-center" id="form-modal">
+<div class="bg-surface w-full max-w-lg rounded-t-2xl p-space-lg flex flex-col gap-space-md max-h-[85vh] overflow-y-auto shadow-xl">
+<div class="bg-primary-container text-on-primary-container p-space-md rounded-xl flex items-center justify-between shadow-sm relative overflow-hidden">
+<div class="flex items-center gap-space-md z-10">
+<button class="w-11 h-11 -ml-1 rounded-full bg-surface/20 flex items-center justify-center shrink-0 active:scale-95 transition-transform" id="btn-volver-form" title="Volver" type="button">
+<span class="material-symbols-outlined text-[24px]">arrow_back</span>
+</button>
+<div class="w-12 h-12 rounded-full bg-surface/20 flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-[24px]">inventory_2</span>
+</div>
+<div>
+<h2 class="font-headline-sm tracking-tight" id="form-titulo">Nuevo Producto</h2>
+<p class="text-body-sm opacity-90">Agrega artículos al inventario de abarrotes</p>
+</div>
+</div>
+<div class="hidden sm:flex items-center justify-center w-10 h-10 rounded-full bg-surface/10">
+<span class="material-symbols-outlined text-[20px]">add_shopping_cart</span>
+</div>
+</div>
+<form class="flex flex-col gap-space-md" id="productForm">
+<div class="flex flex-col gap-space-xs">
+<label class="font-label-md text-on-surface" for="f-nombre">Nombre del Producto</label>
+<div class="relative">
+<input class="w-full bg-surface-container-low text-on-surface text-body-md px-space-md py-3 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all" id="f-nombre" oninput="checkExistingProduct(this.value)" placeholder="Ej. Arroz Faisán 80%..." required="" type="text"/>
+<span class="absolute right-3 top-3.5 material-symbols-outlined text-outline text-[20px]">label</span>
+</div>
+<div class="hidden items-center gap-space-xs text-error text-body-sm mt-1" id="existingWarning">
+<span class="material-symbols-outlined text-[16px]">warning</span>
+<span>¡Atención! Este nombre ya existe en el inventario.</span>
+</div>
+</div>
+<div class="flex flex-col gap-space-xs">
+<label class="font-label-md text-on-surface">Unidad de Medida</label>
+<div class="grid grid-cols-4 gap-space-xs">
+<label class="cursor-pointer">
+<input checked="" class="peer sr-only" name="unidad" type="radio" value="libra"/>
+<div class="flex flex-col items-center justify-center py-2.5 px-2 bg-surface-container-low text-on-surface-variant rounded-xl peer-checked:bg-primary-container peer-checked:text-on-primary-container transition-all text-center">
+<span class="material-symbols-outlined text-[20px] mb-1">scale</span>
+<span class="font-label-sm">Libra</span>
+</div>
+</label>
+<label class="cursor-pointer">
+<input class="peer sr-only" name="unidad" type="radio" value="litro"/>
+<div class="flex flex-col items-center justify-center py-2.5 px-2 bg-surface-container-low text-on-surface-variant rounded-xl peer-checked:bg-primary-container peer-checked:text-on-primary-container transition-all text-center">
+<span class="material-symbols-outlined text-[20px] mb-1">water_drop</span>
+<span class="font-label-sm">Litro</span>
+</div>
+</label>
+<label class="cursor-pointer">
+<input class="peer sr-only" name="unidad" type="radio" value="unidad"/>
+<div class="flex flex-col items-center justify-center py-2.5 px-2 bg-surface-container-low text-on-surface-variant rounded-xl peer-checked:bg-primary-container peer-checked:text-on-primary-container transition-all text-center">
+<span class="material-symbols-outlined text-[20px] mb-1">package_2</span>
+<span class="font-label-sm">Unidad</span>
+</div>
+</label>
+<label class="cursor-pointer">
+<input class="peer sr-only" name="unidad" type="radio" value="bolsa"/>
+<div class="flex flex-col items-center justify-center py-2.5 px-2 bg-surface-container-low text-on-surface-variant rounded-xl peer-checked:bg-primary-container peer-checked:text-on-primary-container transition-all text-center">
+<span class="material-symbols-outlined text-[20px] mb-1">shopping_bag</span>
+<span class="font-label-sm">Bolsa</span>
+</div>
+</label>
+</div>
+</div>
+<div class="grid grid-cols-2 gap-space-md">
+<div class="flex flex-col gap-space-xs">
+<label class="font-label-md text-on-surface" for="f-costo">Costo (C$)</label>
+<div class="relative">
+<span class="absolute left-3 top-3 text-outline text-body-md">C$</span>
+<input class="w-full bg-surface-container-low text-on-surface text-body-md pl-9 pr-3 py-3 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all" id="f-costo" oninput="calculateProfit()" placeholder="0.00" required="" step="0.01" type="number"/>
+</div>
+</div>
+<div class="flex flex-col gap-space-xs">
+<label class="font-label-md text-on-surface" for="f-precio">Precio Venta (C$)</label>
+<div class="relative">
+<span class="absolute left-3 top-3 text-outline text-body-md">C$</span>
+<input class="w-full bg-surface-container-low text-on-surface text-body-md pl-9 pr-3 py-3 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all" id="f-precio" oninput="calculateProfit()" placeholder="0.00" required="" step="0.01" type="number"/>
+</div>
+</div>
+</div>
+<div class="bg-surface-container-low rounded-xl p-space-sm flex items-center justify-between transition-all" id="profitCard">
+<div class="flex items-center gap-space-sm">
+<div class="w-8 h-8 rounded-full bg-surface flex items-center justify-center text-outline" id="profitIconBg">
+<span class="material-symbols-outlined text-[18px]" id="profitIcon">trending_flat</span>
+</div>
+<div>
+<p class="font-label-sm text-on-surface-variant">Ganancia estimada por unidad</p>
+<p class="font-headline-sm text-on-surface" id="profitText">C$ 0.00 <span class="text-body-sm font-normal text-outline" id="profitPercentage">(0%)</span></p>
+</div>
+</div>
+<span class="material-symbols-outlined text-outline text-[20px]">info</span>
+</div>
+<div class="grid grid-cols-2 gap-space-md">
+<div class="flex flex-col gap-space-xs">
+<label class="font-label-md text-on-surface" for="f-stock">Stock Inicial</label>
+<div class="relative">
+<input class="w-full bg-surface-container-low text-on-surface text-body-md px-space-md py-3 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all" id="f-stock" min="0" placeholder="0" required="" type="number"/>
+<span class="absolute right-3 top-3.5 material-symbols-outlined text-outline text-[20px]">inventory</span>
+</div>
+</div>
+<div class="flex flex-col gap-space-xs">
+<label class="font-label-md text-on-surface" for="f-min">Stock Mínimo (Alerta)</label>
+<div class="relative">
+<input class="w-full bg-surface-container-low text-on-surface text-body-md px-space-md py-3 rounded-xl outline-none focus:ring-2 focus:ring-primary transition-all" id="f-min" min="0" placeholder="5" required="" type="number"/>
+<span class="absolute right-3 top-3.5 material-symbols-outlined text-outline text-[20px]">notifications_active</span>
+</div>
+</div>
+</div>
+<div class="pt-space-sm flex flex-col gap-space-sm">
+<button class="w-full h-14 bg-primary text-on-primary rounded-xl font-label-lg flex items-center justify-center gap-space-sm shadow-sm active:scale-[0.99] transition-all hover:bg-primary/90" id="btn-guardar" type="submit">
+<span class="material-symbols-outlined text-[20px]">save</span>
+<span>Guardar Producto</span>
+</button>
+<button class="w-full h-12 bg-surface-container text-on-surface rounded-xl text-label-lg font-label-lg flex items-center justify-center" id="btn-cancelar" type="button">
+Cancelar
+</button>
+</div>
+</form>
+</div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+var productos = [];
+var modoEdicion = null;
+var filtroActual = "all";
+
+var ICONOS = {
+libra: ["rice_bowl", "text-primary"],
+litro: ["oil_barrel", "text-secondary"],
+unidad: ["package_2", "text-secondary"],
+bolsa: ["shopping_bag", "text-tertiary"]
+};
+
+function esBajo(p) {
+return Number(p.stock) <= Number(p.min_stock);
+}
+
+async function cargar() {
+try {
+productos = await api("/api/productos");
+} catch (e) {
+if (e.message !== "Sesion requerida") mostrarToast(e.message, true);
+return;
+}
+renderChips();
+renderAlerta();
+renderLista();
+}
+
+function renderChips() {
+var bajos = productos.filter(esBajo).length;
+document.querySelector("#chip-all span:last-child").textContent = "Todos (" + productos.length + ")";
+document.querySelector("#chip-low span:last-child").textContent = "Stock bajo (" + bajos + ")";
+document.querySelector("#chip-ok span:last-child").textContent = "Normal (" + (productos.length - bajos) + ")";
+}
+
+function renderAlerta() {
+var bajos = productos.filter(esBajo).length;
+var alerta = document.getElementById("alerta-stock");
+if (bajos > 0) {
+document.getElementById("alerta-texto").textContent = bajos + (bajos === 1 ? " producto con stock bajo necesita reposición" : " productos con stock bajo necesitan reposición");
+alerta.classList.remove("hidden");
+alerta.classList.add("flex");
+} else {
+alerta.classList.add("hidden");
+alerta.classList.remove("flex");
+}
+}
+
+function renderLista() {
+var cont = document.getElementById("productList");
+cont.innerHTML = "";
+if (!productos.length) {
+cont.innerHTML = '<div class="py-10 text-center text-body-sm text-on-surface-variant bg-surface-container-low rounded-xl">No hay productos todavía. Toca "+ Producto" para crear el primero.</div>';
+return;
+}
+productos.forEach(function(p) {
+var bajo = esBajo(p);
+var icono = ICONOS[p.unit] || ["inventory_2", "text-primary"];
+var card = document.createElement("div");
+card.className = "product-card flex items-center justify-between p-4 bg-surface-container-lowest rounded-xl shadow-sm border border-outline-variant/20 transition-all";
+card.setAttribute("data-name", p.name.toLowerCase());
+card.setAttribute("data-status", bajo ? "low" : "ok");
+card.innerHTML =
+'<div class="flex items-center gap-3.5 min-w-0">' +
+'<div class="w-12 h-12 rounded-xl bg-surface-container flex items-center justify-center flex-shrink-0 ' + icono[1] + '">' +
+'<span class="material-symbols-outlined">' + icono[0] + "</span>" +
+"</div>" +
+'<div class="min-w-0">' +
+'<div class="flex items-center gap-2">' +
+'<h4 class="text-label-lg font-semibold text-on-surface truncate">' + escapeHtml(p.name) + "</h4>" +
+(bajo ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-error-container text-on-error-container">Bajo</span>' : "") +
+"</div>" +
+'<p class="text-body-sm text-on-surface-variant">Quedan ' + corto(p.stock) + " · Mínimo " + corto(p.min_stock) + " · " + dinero(p.price) + "</p>" +
+"</div>" +
+"</div>" +
+'<div class="flex items-center gap-2 shrink-0">' +
+'<button class="flex items-center gap-1 bg-surface-container hover:bg-primary hover:text-on-primary text-on-surface px-3 py-2 rounded-xl text-label-sm font-medium transition-all flex-shrink-0" data-accion="entrada" data-id="' + p.id + '" type="button">' +
+'<span class="material-symbols-outlined text-[16px]">add</span>' +
+"<span>Entrada</span>" +
+"</button>" +
+'<button class="w-9 h-9 rounded-full bg-surface-container text-on-surface-variant flex items-center justify-center hover:text-on-surface transition-all" data-accion="editar" data-id="' + p.id + '" title="Editar" type="button">' +
+'<span class="material-symbols-outlined text-[18px]">edit</span>' +
+"</button>" +
+'<button class="w-9 h-9 rounded-full bg-error-container text-on-error-container flex items-center justify-center hover:opacity-90 transition-all" data-accion="borrar" data-id="' + p.id + '" title="Borrar" type="button">' +
+'<span class="material-symbols-outlined text-[18px]">delete</span>' +
+"</button>" +
+"</div>";
+cont.appendChild(card);
+});
+cont.querySelectorAll("button[data-accion]").forEach(function(b) {
+b.addEventListener("click", function() {
+var id = b.dataset.id;
+var p = productos.find(function(x) { return x.id === id; });
+if (b.dataset.accion === "entrada") entradaStock(p);
+else if (b.dataset.accion === "editar") abrirFormulario(id);
+else if (b.dataset.accion === "borrar") borrarProducto(p);
+});
+});
+applyFilters();
+}
+
+function setFilter(filtro) {
+filtroActual = filtro;
+["all", "low", "ok"].forEach(function(f) {
+var btn = document.getElementById("chip-" + f);
+if (f === filtro) {
+btn.className = "flex items-center gap-space-xs px-4 py-2 rounded-full text-label-md font-medium transition-all bg-primary text-on-primary";
+} else {
+btn.className = "flex items-center gap-space-xs px-4 py-2 rounded-full text-label-md font-medium transition-all bg-surface-container text-on-surface-variant hover:bg-surface-container-high";
+}
+});
+applyFilters();
+}
+
+function applyFilters() {
+var query = document.getElementById("searchInput").value.toLowerCase();
+document.querySelectorAll(".product-card").forEach(function(card) {
+var status = card.getAttribute("data-status");
+var name = card.getAttribute("data-name");
+var coincide = name.includes(query);
+var pasa = true;
+if (filtroActual === "low" && status !== "low") pasa = false;
+if (filtroActual === "ok" && status !== "ok") pasa = false;
+card.style.display = coincide && pasa ? "flex" : "none";
+});
+}
+
+async function entradaStock(p) {
+if (!p) return;
+var respuesta = prompt("¿Cuántas unidades entraron de " + p.name + "?");
+if (respuesta === null) return;
+var cantidad = Number(respuesta);
+if (!Number.isFinite(cantidad) || cantidad <= 0) {
+mostrarToast("La cantidad debe ser mayor a cero", true);
+return;
+}
+try {
+await api("/api/productos/" + p.id + "/entrada", {
+method: "POST",
+headers: { "Content-Type": "application/json" },
+body: JSON.stringify({ cantidad: String(cantidad) })
+});
+mostrarToast("Se sumó stock a: " + p.name);
+cargar();
+} catch (e) {
+if (e.message !== "Sesion requerida") mostrarToast(e.message, true);
+}
+}
+
+async function borrarProducto(p) {
+if (!p) return;
+if (!confirm("¿Borrar " + p.name + " del inventario?")) return;
+try {
+await api("/api/productos/" + p.id, { method: "DELETE" });
+mostrarToast("Producto borrado: " + p.name);
+cargar();
+} catch (e) {
+if (e.message !== "Sesion requerida") mostrarToast(e.message, true);
+}
+}
+
+function abrirFormulario(id) {
+modoEdicion = id || null;
+var form = document.getElementById("productForm");
+form.reset();
+document.getElementById("existingWarning").classList.add("hidden");
+document.getElementById("existingWarning").classList.remove("flex");
+document.getElementById("form-titulo").textContent = modoEdicion ? "Editar Producto" : "Nuevo Producto";
+if (modoEdicion) {
+var p = productos.find(function(x) { return x.id === modoEdicion; });
+if (p) {
+document.getElementById("f-nombre").value = p.name;
+document.getElementById("f-costo").value = p.cost;
+document.getElementById("f-precio").value = p.price;
+document.getElementById("f-stock").value = corto(p.stock);
+document.getElementById("f-min").value = corto(p.min_stock);
+var radio = document.querySelector('input[name="unidad"][value="' + p.unit + '"]');
+if (radio) radio.checked = true;
+}
+}
+calculateProfit();
+var modal = document.getElementById("form-modal");
+modal.classList.remove("hidden");
+modal.classList.add("flex");
+history.pushState({ formulario: modoEdicion || "nuevo" }, "", "#form");
+}
+
+function cerrarFormulario(desdePop) {
+var modal = document.getElementById("form-modal");
+modal.classList.add("hidden");
+modal.classList.remove("flex");
+modoEdicion = null;
+if (!desdePop && location.hash === "#form") {
+history.back();
+} else if (location.hash === "#form") {
+history.replaceState(null, "", location.pathname + location.search);
+}
+}
+
+function checkExistingProduct(valor) {
+var warning = document.getElementById("existingWarning");
+var limpio = valor.trim().toLowerCase();
+var duplicado = limpio.length > 2 && productos.some(function(p) {
+return p.name.toLowerCase() === limpio && p.id !== modoEdicion;
+});
+if (duplicado) {
+warning.classList.remove("hidden");
+warning.classList.add("flex");
+} else {
+warning.classList.remove("flex");
+warning.classList.add("hidden");
+}
+}
+
+function calculateProfit() {
+var cost = parseFloat(document.getElementById("f-costo").value) || 0;
+var sell = parseFloat(document.getElementById("f-precio").value) || 0;
+var profit = sell - cost;
+var margin = cost > 0 ? ((profit / cost) * 100).toFixed(1) : 0;
+var profitText = document.getElementById("profitText");
+var profitPercentage = document.getElementById("profitPercentage");
+var profitCard = document.getElementById("profitCard");
+var profitIconBg = document.getElementById("profitIconBg");
+var profitIcon = document.getElementById("profitIcon");
+profitText.childNodes[0].nodeValue = "C$ " + profit.toFixed(2) + " ";
+profitPercentage.textContent = "(" + margin + "%)";
+if (profit > 0) {
+profitCard.className = "bg-secondary-container/30 text-on-surface rounded-xl p-space-md flex items-center justify-between transition-all";
+profitIconBg.className = "w-8 h-8 rounded-full bg-secondary text-on-secondary flex items-center justify-center";
+profitIcon.textContent = "trending_up";
+} else if (profit < 0) {
+profitCard.className = "bg-error-container/30 text-on-surface rounded-xl p-space-md flex items-center justify-between transition-all";
+profitIconBg.className = "w-8 h-8 rounded-full bg-error text-on-error flex items-center justify-center";
+profitIcon.textContent = "trending_down";
+} else {
+profitCard.className = "bg-surface-container-low text-on-surface rounded-xl p-space-md flex items-center justify-between transition-all";
+profitIconBg.className = "w-8 h-8 rounded-full bg-surface text-outline flex items-center justify-center";
+profitIcon.textContent = "trending_flat";
+}
+}
+
+document.getElementById("productForm").addEventListener("submit", async function(ev) {
+ev.preventDefault();
+var unidad = document.querySelector('input[name="unidad"]:checked');
+var datos = {
+name: document.getElementById("f-nombre").value.trim(),
+cost: document.getElementById("f-costo").value,
+price: document.getElementById("f-precio").value,
+stock: document.getElementById("f-stock").value || "0",
+min_stock: document.getElementById("f-min").value || "0",
+unit: unidad ? unidad.value : "unidad"
+};
+var btn = document.getElementById("btn-guardar");
+btn.disabled = true;
+try {
+if (modoEdicion) {
+await api("/api/productos/" + modoEdicion, {
+method: "PUT",
+headers: { "Content-Type": "application/json" },
+body: JSON.stringify(datos)
+});
+} else {
+await api("/api/productos", {
+method: "POST",
+headers: { "Content-Type": "application/json" },
+body: JSON.stringify(datos)
+});
+}
+mostrarToast("¡Guardado con éxito! El producto está en el inventario.");
+cerrarFormulario();
+cargar();
+} catch (e) {
+if (e.message !== "Sesion requerida") mostrarToast(e.message, true);
+} finally {
+btn.disabled = false;
+}
+});
+
+document.getElementById("btn-nuevo").addEventListener("click", function() { abrirFormulario(null); });
+document.getElementById("btn-cancelar").addEventListener("click", cerrarFormulario);
+document.getElementById("btn-ver-bajos").addEventListener("click", function() { setFilter("low"); });
+document.getElementById("form-modal").addEventListener("click", function(ev) {
+if (ev.target === ev.currentTarget) cerrarFormulario();
+});
+document.getElementById("btn-volver-form").addEventListener("click", function() { if (!document.getElementById("form-modal").classList.contains("hidden")) history.back(); });
+window.addEventListener("popstate", function() {
+if (!document.getElementById("form-modal").classList.contains("hidden")) cerrarFormulario(true);
+});
+cargar();
+</script>
+{% endblock %}

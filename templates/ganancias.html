@@ -1,0 +1,241 @@
+{% extends "base.html" %}
+{% block titulo %}Ganancias · Abarrotes La Esquina{% endblock %}
+{% block header_titulo %}Ganancias{% endblock %}
+{% block contenido %}
+<div class="flex flex-col w-full px-gutter pt-16 pb-24 gap-space-md">
+<div class="flex bg-surface-container-low p-space-xs rounded-xl gap-space-xs">
+<button class="flex-1 py-2 text-center rounded-lg text-label-md font-label-md bg-primary text-on-primary transition-all shadow-sm" id="btn-today" onclick="switchTab('hoy')" type="button">Hoy</button>
+<button class="flex-1 py-2 text-center rounded-lg text-label-md font-label-md text-on-surface-variant hover:text-on-surface transition-all" id="btn-week" onclick="switchTab('semana')" type="button">Semana</button>
+<button class="flex-1 py-2 text-center rounded-lg text-label-md font-label-md text-on-surface-variant hover:text-on-surface transition-all" id="btn-month" onclick="switchTab('mes')" type="button">Mes</button>
+</div>
+<div class="grid grid-cols-2 gap-space-md">
+<div class="bg-surface-container-low p-space-md rounded-xl flex flex-col justify-between">
+<div class="flex items-center justify-between text-on-surface-variant mb-space-sm">
+<span class="text-label-sm font-label-sm">Vendido</span>
+<span class="material-symbols-outlined text-[18px]">shopping_bag</span>
+</div>
+<div>
+<span class="text-headline-md font-headline-md text-on-surface" id="metric-sold">C$ 0.00</span>
+<div class="flex items-center gap-space-xs mt-space-xs text-secondary">
+<span class="material-symbols-outlined text-[14px]">trending_up</span>
+<span class="text-label-sm font-label-sm" id="metric-sold-sub">0 ventas</span>
+</div>
+</div>
+</div>
+<div class="bg-secondary-container p-space-md rounded-xl flex flex-col justify-between">
+<div class="flex items-center justify-between text-on-secondary-container mb-space-sm">
+<span class="text-label-sm font-label-sm">Ganancia Neta</span>
+<span class="material-symbols-outlined text-[18px]" style="font-variation-settings: 'FILL' 1;">payments</span>
+</div>
+<div>
+<span class="text-headline-md font-headline-md text-on-secondary-container" id="metric-profit">C$ 0.00</span>
+<div class="flex items-center gap-space-xs mt-space-xs text-on-secondary-container opacity-80">
+<span class="text-label-sm font-label-sm" id="metric-margin">Margen 0%</span>
+</div>
+</div>
+</div>
+</div>
+<div class="flex items-center justify-between mt-space-sm">
+<h2 class="text-headline-sm font-headline-sm text-on-surface">Ventas del Periodo</h2>
+<span class="text-label-sm font-label-sm text-on-surface-variant" id="sales-count">0 transacciones</span>
+</div>
+<div class="flex flex-col gap-space-sm" id="sales-list"></div>
+</div>
+<div class="fixed inset-0 z-50 bg-inverse-surface/40 backdrop-blur-sm hidden items-end justify-center" id="sale-modal">
+<div class="bg-surface w-full max-w-lg rounded-t-2xl p-space-lg flex flex-col gap-space-md max-h-[751px] overflow-y-auto shadow-xl">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-space-sm">
+<button class="w-11 h-11 -ml-2 rounded-full flex items-center justify-center text-on-surface active:scale-95 transition-transform" id="btn-volver-modal" title="Volver" type="button">
+<span class="material-symbols-outlined">arrow_back</span>
+</button>
+<span class="material-symbols-outlined text-primary text-[24px]">receipt_long</span>
+<h3 class="text-headline-sm font-headline-sm text-on-surface" id="modal-title">Detalle de Venta</h3>
+</div>
+<button class="w-8 h-8 rounded-full bg-surface-container flex items-center justify-center text-on-surface-variant hover:text-on-surface" id="btn-cerrar-top" type="button">
+<span class="material-symbols-outlined text-[18px]">close</span>
+</button>
+</div>
+<div class="flex justify-between items-center bg-surface-container-low p-space-md rounded-xl">
+<div class="flex flex-col">
+<span class="text-label-sm text-on-surface-variant">Hora de emisión</span>
+<span class="text-label-lg font-label-lg text-on-surface" id="modal-time">--:--</span>
+</div>
+<div class="flex flex-col items-end">
+<span class="text-label-sm text-on-surface-variant">Ganancia de Ticket</span>
+<span class="text-label-lg font-label-lg text-secondary font-medium" id="modal-profit">C$ 0.00</span>
+</div>
+</div>
+<div class="flex flex-col gap-space-xs">
+<span class="text-label-sm font-label-sm text-on-surface-variant">Productos incluidos</span>
+<div class="flex flex-col gap-space-xs bg-surface-container-low p-space-md rounded-xl" id="modal-products"></div>
+</div>
+<div class="flex items-center justify-between pt-space-sm border-t border-surface-container">
+<span class="text-headline-sm font-headline-sm text-on-surface">Total Cobrado</span>
+<span class="text-headline-sm font-headline-sm text-primary" id="modal-total">C$ 0.00</span>
+</div>
+<div class="flex flex-col gap-space-sm mt-space-md">
+<button class="w-full h-12 bg-error-container text-on-error-container rounded-xl text-label-lg font-label-lg flex items-center justify-center gap-space-sm hover:opacity-90 transition-all" id="btn-anular" type="button">
+<span class="material-symbols-outlined text-[20px]">undo</span>
+Anular venta (Devolver stock)
+</button>
+<button class="w-full h-12 bg-surface-container text-on-surface rounded-xl text-label-lg font-label-lg flex items-center justify-center" id="btn-cerrar" type="button">
+Cerrar
+</button>
+</div>
+</div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+var rangoActual = "hoy";
+var ventaActual = null;
+
+function etiquetaHora(iso) {
+var f = new Date(iso);
+var h = String(f.getHours()).padStart(2, "0");
+var m = String(f.getMinutes()).padStart(2, "0");
+return h + ":" + m;
+}
+
+function switchTab(rango) {
+rangoActual = rango;
+["today", "week", "month"].forEach(function(t) {
+var btn = document.getElementById("btn-" + t);
+var activo = (t === "today" && rango === "hoy") || (t === "week" && rango === "semana") || (t === "month" && rango === "mes");
+if (activo) {
+btn.className = "flex-1 py-2 text-center rounded-lg text-label-md font-label-md bg-primary text-on-primary transition-all shadow-sm";
+} else {
+btn.className = "flex-1 py-2 text-center rounded-lg text-label-md font-label-md text-on-surface-variant hover:text-on-surface transition-all";
+}
+});
+cargar();
+}
+
+async function cargar() {
+try {
+var datos = await Promise.all([
+api("/api/ganancias?rango=" + rangoActual),
+api("/api/ventas?rango=" + rangoActual)
+]);
+renderMetricas(datos[0]);
+renderVentas(datos[1]);
+} catch (e) {
+if (e.message !== "Sesion requerida") mostrarToast(e.message, true);
+}
+}
+
+function renderMetricas(g) {
+document.getElementById("metric-sold").textContent = dineroLargo(g.vendido);
+document.getElementById("metric-sold-sub").textContent = g.cantidad_ventas + (g.cantidad_ventas === 1 ? " venta" : " ventas");
+document.getElementById("metric-profit").textContent = dineroLargo(g.ganancia);
+var margen = g.vendido > 0 ? Math.round((g.ganancia / g.vendido) * 100) : 0;
+document.getElementById("metric-margin").textContent = "Margen " + margen + "%";
+document.getElementById("sales-count").textContent = g.cantidad_ventas + (g.cantidad_ventas === 1 ? " transacción" : " transacciones");
+}
+
+function renderVentas(ventas) {
+var cont = document.getElementById("sales-list");
+cont.innerHTML = "";
+if (!ventas.length) {
+cont.innerHTML = '<div class="py-10 text-center text-body-sm text-on-surface-variant bg-surface-container-low rounded-xl">No hay ventas en este periodo.</div>';
+return;
+}
+ventas.forEach(function(s) {
+var anulada = s.status === "anulada";
+var ticket = "#" + String(s.id).slice(0, 6).toUpperCase();
+var card = document.createElement("div");
+card.className = "bg-surface-container-low p-space-md rounded-xl flex items-center justify-between cursor-pointer hover:bg-surface-container transition-all" + (anulada ? " opacity-60" : "");
+card.innerHTML =
+'<div class="flex items-center gap-space-md">' +
+'<div class="w-10 h-10 rounded-full bg-primary-fixed flex items-center justify-center text-primary">' +
+'<span class="material-symbols-outlined text-[20px]">receipt</span>' +
+"</div>" +
+'<div class="flex flex-col">' +
+'<div class="flex items-center gap-space-sm">' +
+'<span class="text-label-lg font-label-lg text-on-surface">' + etiquetaHora(s.created_at) + "</span>" +
+'<span class="text-label-sm font-label-sm text-on-surface-variant bg-surface-container-high px-space-xs py-0.5 rounded">' + s.items_count + " art.</span>" +
+"</div>" +
+'<span class="text-body-sm text-on-surface-variant">Ticket ' + ticket + "</span>" +
+"</div>" +
+"</div>" +
+'<div class="flex flex-col items-end">' +
+'<span class="text-label-lg font-label-lg text-on-surface">' + dineroLargo(s.total) + "</span>" +
+(anulada
+? '<span class="text-label-sm font-label-sm text-on-surface-variant">Anulada</span>'
+: '<span class="text-label-sm font-label-sm text-secondary font-medium">+' + dineroLargo(s.profit) + "</span>") +
+"</div>";
+card.addEventListener("click", function() { openDetail(s.id); });
+cont.appendChild(card);
+});
+}
+
+async function openDetail(id) {
+var venta;
+try {
+venta = await api("/api/ventas/" + id);
+} catch (e) {
+if (e.message !== "Sesion requerida") mostrarToast(e.message, true);
+return;
+}
+ventaActual = venta;
+var ticket = "#" + String(venta.id).slice(0, 6).toUpperCase();
+document.getElementById("modal-title").textContent = "Detalle de Venta " + ticket;
+document.getElementById("modal-time").textContent = etiquetaHora(venta.created_at);
+document.getElementById("modal-profit").textContent = dineroLargo(venta.profit);
+document.getElementById("modal-total").textContent = dineroLargo(venta.total);
+var cont = document.getElementById("modal-products");
+cont.innerHTML = "";
+(venta.items || []).forEach(function(i) {
+var fila = document.createElement("div");
+fila.className = "flex justify-between items-center text-body-sm text-on-surface";
+fila.innerHTML =
+"<span>" + Number(i.quantity) + "x " + escapeHtml(i.product_name) + "</span>" +
+'<span class="text-on-surface-variant">' + dinero(i.unit_price) + "</span>";
+cont.appendChild(fila);
+});
+document.getElementById("btn-anular").classList.toggle("hidden", venta.status !== "completada");
+var modal = document.getElementById("sale-modal");
+modal.classList.remove("hidden");
+modal.classList.add("flex");
+history.pushState({ detalle: venta.id }, "", "#venta-" + venta.id);
+}
+
+function closeDetail(desdePop) {
+var modal = document.getElementById("sale-modal");
+modal.classList.add("hidden");
+modal.classList.remove("flex");
+ventaActual = null;
+if (!desdePop && location.hash.indexOf("#venta-") === 0) {
+history.back();
+} else if (location.hash.indexOf("#venta-") === 0) {
+history.replaceState(null, "", location.pathname + location.search);
+}
+}
+
+async function voidSale() {
+if (!ventaActual) return;
+if (!confirm("¿Anular esta venta? Se devolverá el stock.")) return;
+var id = ventaActual.id;
+try {
+await api("/api/ventas/" + id + "/anular", { method: "POST" });
+closeDetail();
+mostrarToast("Venta anulada con éxito. Stock devuelto.");
+cargar();
+} catch (e) {
+if (e.message !== "Sesion requerida") mostrarToast(e.message, true);
+}
+}
+
+document.getElementById("btn-anular").addEventListener("click", voidSale);
+document.getElementById("btn-cerrar").addEventListener("click", closeDetail);
+document.getElementById("btn-cerrar-top").addEventListener("click", closeDetail);
+document.getElementById("sale-modal").addEventListener("click", function(ev) {
+if (ev.target === ev.currentTarget) closeDetail();
+});
+document.getElementById("btn-volver-modal").addEventListener("click", function() { if (ventaActual) history.back(); });
+window.addEventListener("popstate", function() {
+if (ventaActual) closeDetail(true);
+});
+cargar();
+</script>
+{% endblock %}

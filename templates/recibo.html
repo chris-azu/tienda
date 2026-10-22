@@ -1,0 +1,468 @@
+{% extends "base.html" %}
+{% block titulo %}Recibo · Abarrotes La Esquina{% endblock %}
+{% block header_titulo %}Recibo{% endblock %}
+{% block volver %}
+<button class="w-11 h-11 -ml-2 rounded-full flex items-center justify-center text-on-surface active:scale-95 transition-transform" id="btn-volver" title="Volver" type="button">
+<span class="material-symbols-outlined">arrow_back</span>
+</button>
+{% endblock %}
+{% block contenido %}
+<div class="flex flex-col w-full px-gutter pt-20 pb-40">
+
+<!-- Impresora -->
+<div class="impresora bg-inverse-surface text-inverse-on-surface rounded-xl p-4 shadow-lg">
+<div class="flex items-start justify-between gap-3">
+<div class="flex flex-col">
+<span class="text-label-sm opacity-70">Venta</span>
+<span class="text-headline-sm font-headline" id="imp-ticket">—</span>
+</div>
+<div class="text-right">
+<span class="text-label-sm opacity-70">Total</span>
+<div class="text-headline-md font-headline" id="imp-total">—</div>
+</div>
+</div>
+<div class="mt-3 flex items-center gap-2 rounded-lg px-3 py-2 bg-white/10 transition-colors duration-300" id="estado-linea">
+<span class="relative flex items-center justify-center w-4 h-4 shrink-0">
+<span class="luz" id="estado-luz"></span>
+<span class="luz-anillo" id="estado-anillo"></span>
+</span>
+<span class="text-label-md flex-grow transition-colors duration-400" id="estado-texto">Imprimiendo recibo…</span>
+<button class="hidden text-label-md font-medium text-error underline decoration-error/60 underline-offset-2" id="btn-reintentar" type="button">Reintentar</button>
+</div>
+<div class="mt-3 h-2 rounded-full bg-black/60 shadow-inner relative overflow-hidden" id="ranura"></div>
+</div>
+
+<!-- Papel (sale de la ranura) -->
+<div class="papel-wrap" id="papel-wrap">
+<div class="papel" id="papel">
+<div class="recibo" id="recibo"></div>
+</div>
+</div>
+
+</div>
+
+<!-- Botones fijos -->
+<div class="fixed bottom-20 inset-x-0 z-40 px-4 py-3 bg-surface-container-lowest/95 backdrop-blur-md shadow-lg border-t border-surface-container flex items-center gap-3">
+<button class="flex-1 h-12 bg-surface-container-high text-on-surface rounded-xl font-label-lg flex items-center justify-center gap-2 active:scale-95 transition-all" id="btn-nueva" type="button">
+<span class="material-symbols-outlined text-[20px]">add</span>
+Nueva venta
+</button>
+<button class="flex-1 h-12 bg-primary text-on-primary rounded-xl font-label-lg flex items-center justify-center gap-2 shadow-sm active:scale-95 transition-all disabled:opacity-60" id="btn-imprimir" type="button">
+<span class="material-symbols-outlined text-[20px]">print</span>
+Imprimir
+</button>
+</div>
+{% endblock %}
+{% block nav %}{% endblock %}
+{% block scripts %}
+<style>
+.papel-wrap {
+position: relative;
+overflow: hidden;
+max-height: none;
+height: 0;
+border-radius: 0 0 6px 6px;
+}
+.papel-wrap.preparado {
+height: auto;
+}
+.papel {
+margin-top: 0.5rem;
+background: #ffffff;
+color: #111111;
+border-radius: 0 0 6px 6px;
+filter: drop-shadow(0 8px 16px rgba(0,0,0,0.18));
+-webkit-mask-image: linear-gradient(#000 0 0),
+repeating-linear-gradient(90deg, #000 0 7px, transparent 7px 14px);
+mask-image: linear-gradient(#000 0 0),
+repeating-linear-gradient(90deg, #000 0 7px, transparent 7px 14px);
+will-change: transform;
+transform: translateY(-100%);
+transition: transform 3.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.papel-wrap.saliendo .papel {
+transform: translateY(0%);
+}
+.papel-wrap.reducido .papel {
+transition: none;
+}
+
+/* Luz de estado */
+.luz {
+width: 10px;
+height: 10px;
+border-radius: 9999px;
+background: #9ca3af;
+opacity: 0.5;
+}
+.luz.pulsando {
+background: #f59e0b;
+animation: parpadeo 1.2s ease-in-out infinite;
+}
+.luz.ok {
+background: #22c55e;
+opacity: 1;
+animation: none;
+box-shadow: 0 0 10px 2px rgba(34, 197, 94, 0.75);
+transition: background-color 400ms ease, box-shadow 400ms ease, opacity 400ms ease;
+}
+.luz.error {
+background: #ef4444;
+opacity: 1;
+animation: none;
+box-shadow: 0 0 10px 2px rgba(239, 68, 68, 0.6);
+transition: background-color 400ms ease, box-shadow 400ms ease;
+}
+.luz-anillo {
+position: absolute;
+inset: 0;
+border-radius: 9999px;
+border: 2px solid #22c55e;
+opacity: 0;
+pointer-events: none;
+}
+.luz-anillo.activar {
+animation: anillo 700ms ease-out 1;
+}
+@keyframes parpadeo {
+0%, 100% { opacity: 0.35; transform: scale(0.9); }
+50% { opacity: 1; transform: scale(1.15); }
+}
+@keyframes anillo {
+0% { opacity: 0.8; transform: scale(1); }
+100% { opacity: 0; transform: scale(3); }
+}
+.recibo {
+font-family: ui-monospace, "SFMono-Regular", "Menlo", "Consolas", monospace;
+font-size: 12.5px;
+line-height: 1.5;
+padding: 16px 16px 24px;
+}
+.recibo .titulo {
+text-align: center;
+font-weight: 700;
+font-size: 15px;
+letter-spacing: 0.04em;
+text-transform: uppercase;
+}
+.recibo .centro { text-align: center; }
+.recibo .muted { color: #555555; }
+.recibo .punteada {
+border: none;
+border-top: 1px dashed #9ca3af;
+margin: 10px 0;
+}
+.recibo .item { margin-top: 6px; }
+.recibo .linea {
+display: flex;
+justify-content: space-between;
+gap: 8px;
+}
+.recibo .linea .nom { flex: 1; word-break: break-word; font-weight: 600; }
+.recibo .linea .val { white-space: nowrap; }
+.recibo .detalle {
+color: #555555;
+font-size: 11.5px;
+padding-left: 2px;
+}
+.recibo .total-linea {
+display: flex;
+justify-content: space-between;
+align-items: baseline;
+font-weight: 700;
+font-size: 20px;
+margin-top: 4px;
+}
+.recibo .gracias { text-align: center; margin-top: 12px; font-size: 11.5px; }
+.estado-ok {
+background-color: rgba(124, 249, 148, 0.18) !important;
+}
+.estado-ok #estado-texto { color: #7cf994; }
+.estado-error {
+background-color: rgba(186, 26, 26, 0.22) !important;
+}
+.estado-error #estado-texto { color: #ffb4ab; }
+.duration-400 { transition-duration: 400ms; }
+
+@media print {
+@page { size: 58mm auto; margin: 3mm; }
+body * { visibility: hidden !important; }
+#papel, #papel * { visibility: visible !important; }
+header, nav, .impresora { display: none !important; }
+#papel-wrap { height: auto !important; position: absolute; inset: 0 auto auto 0; }
+#papel {
+position: absolute;
+left: 0; top: 0;
+width: 58mm;
+margin: 0;
+transform: none !important;
+filter: none;
+box-shadow: none;
+-webkit-mask-image: none;
+mask-image: none;
+}
+#recibo { padding: 0; font-size: 11px; }
+}
+@media (prefers-reduced-motion: reduce) {
+.papel { transition: none !important; }
+.luz.pulsando { animation: none !important; opacity: 1; background: #f59e0b; }
+.luz-anillo.activar { animation: none !important; opacity: 0; }
+}
+</style>
+<script>
+var ventaId = null;
+var ventaFecha = null;
+var lineasRecibo = [];
+var totalRecibo = 0;
+var animando = false;
+var DURACION_MS = 2500;
+
+function fechaLarga(iso) {
+var d = iso ? new Date(iso) : new Date();
+return d.toLocaleDateString("es-NI", { day: "2-digit", month: "2-digit", year: "numeric" }) +
+" " + d.toLocaleTimeString("es-NI", { hour: "2-digit", minute: "2-digit" });
+}
+
+function unidadTxt(cantidad, unidad) {
+var u = (unidad || "").toString().trim();
+var n = Number(cantidad);
+if (!u) return corto(n);
+var plural = u;
+if (n !== 1 && !/s$/i.test(u)) {
+if (/^unidad$/i.test(u)) plural = "unidades";
+else if (/^libra$/i.test(u)) plural = "libras";
+else if (/^litro$/i.test(u)) plural = "litros";
+else if (/^bolsa$/i.test(u)) plural = "bolsas";
+else plural = u + "s";
+}
+return corto(n) + " " + plural;
+}
+
+function construirRecibo() {
+var ticket = "#" + String(ventaId).slice(0, 6).toUpperCase();
+var now = ventaFecha || new Date().toISOString();
+var html =
+'<div class="titulo">Abarrotes La Esquina</div>' +
+'<div class="centro muted">Puesto Express</div>' +
+'<div class="centro muted" style="margin-top:2px;">' + fechaLarga(now) + '</div>' +
+'<div class="centro muted">Ticket ' + ticket + '</div>' +
+'<hr class="punteada"/>';
+lineasRecibo.forEach(function(l) {
+html +=
+'<div class="item">' +
+'<div class="linea">' +
+'<span class="nom">' + escapeHtml(l.nombre) + '</span>' +
+'<span class="val">' + dinero(l.subtotal) + '</span>' +
+'</div>' +
+'<div class="detalle">' + unidadTxt(l.cantidad, l.unidad) + ' · ' + dinero(l.precio) + ' c/u</div>' +
+'</div>';
+});
+html +=
+'<hr class="punteada"/>' +
+'<div class="total-linea">' +
+'<span>TOTAL</span>' +
+'<span>' + dineroLargo(totalRecibo) + '</span>' +
+'</div>' +
+'<hr class="punteada"/>' +
+'<div class="gracias">¡Gracias por su compra!</div>' +
+'<div class="gracias muted">Vuelva pronto</div>';
+return html;
+}
+
+function pintarRecibo() {
+document.getElementById("imp-ticket").textContent = ventaId ? "#" + String(ventaId).slice(0, 6).toUpperCase() : "—";
+document.getElementById("imp-total").textContent = dineroLargo(totalRecibo);
+document.getElementById("recibo").innerHTML = construirRecibo();
+}
+
+function lineasDesdeItems(items) {
+return (items || []).map(function(i) {
+var cant = Number(i.quantity != null ? i.quantity : i.cantidad);
+var precio = Number(i.unit_price != null ? i.unit_price : i.precio);
+return {
+nombre: i.product_name != null ? i.product_name : i.nombre,
+cantidad: cant,
+unidad: i.unit || i.unidad || "",
+precio: precio,
+subtotal: i.subtotal != null ? Number(i.subtotal) : precio * cant
+};
+});
+}
+
+function armarDesdeDatos(datos) {
+ventaId = datos.venta.id;
+ventaFecha = datos.venta.created_at;
+totalRecibo = Number(datos.venta.total);
+lineasRecibo = (datos.lineas || []).map(function(l) {
+return {
+nombre: l.nombre,
+cantidad: Number(l.cantidad),
+unidad: l.unidad || "",
+precio: Number(l.precio),
+subtotal: Number(l.subtotal)
+};
+});
+pintarRecibo();
+}
+
+async function cargarRespaldo(id) {
+var detalle = await api("/api/ventas/" + id);
+if (!detalle || !detalle.id) throw new Error("Venta no encontrada");
+var lineas = lineasDesdeItems(detalle.items);
+var datos = {
+venta: {
+id: detalle.id,
+created_at: detalle.created_at,
+total: detalle.total
+},
+lineas: lineas.length ? lineas : null
+};
+armarDesdeDatos(datos);
+return datos;
+}
+
+function setEstado(tipo, texto) {
+var linea = document.getElementById("estado-linea");
+var luz = document.getElementById("estado-luz");
+var anillo = document.getElementById("estado-anillo");
+linea.classList.remove("estado-ok", "estado-error");
+luz.classList.remove("pulsando", "ok", "error");
+anillo.classList.remove("activar");
+
+if (tipo === "ok") {
+linea.classList.add("estado-ok");
+luz.classList.add("ok");
+void anillo.offsetWidth;
+anillo.classList.add("activar");
+} else if (tipo === "error") {
+linea.classList.add("estado-error");
+luz.classList.add("error");
+} else if (tipo === "progreso") {
+luz.classList.add("pulsando");
+}
+
+document.getElementById("estado-texto").textContent = texto;
+document.getElementById("btn-reintentar").className =
+"text-label-md font-medium text-error underline decoration-error/60 underline-offset-2" +
+(tipo === "error" ? "" : " hidden");
+}
+
+function estadoListo() {
+setEstado("ok", "Recibo impreso");
+if (navigator.vibrate) { try { navigator.vibrate(40); } catch (e) {} }
+}
+
+function estadoError(msg) {
+setEstado("error", msg || "No se pudo imprimir");
+}
+
+function imprimir() {
+if (animando) return;
+animando = true;
+var btn = document.getElementById("btn-imprimir");
+btn.disabled = true;
+
+try {
+if (!lineasRecibo.length || !ventaId) {
+estadoError("No se pudo imprimir");
+return;
+}
+
+var wrap = document.getElementById("papel-wrap");
+var reducido = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+setEstado("progreso", "Imprimiendo recibo…");
+
+var finalizado = false;
+var temporizador = null;
+function terminar() {
+if (finalizado) return;
+finalizado = true;
+if (temporizador) clearTimeout(temporizador);
+wrap.removeEventListener("transitionend", onEnd);
+estadoListo();
+try { window.print(); } catch (e) {
+estadoError("No se pudo imprimir");
+}
+}
+function onEnd(ev) {
+if (ev.propertyName === "transform") terminar();
+}
+
+// El recibo ya está completo en el DOM: preparar altura y salir de la ranura.
+if (reducido) {
+wrap.classList.add("preparado", "reducido", "saliendo");
+terminar();
+return;
+}
+
+var altura = document.getElementById("papel").offsetHeight;
+wrap.style.height = altura + "px";
+wrap.classList.add("preparado");
+wrap.classList.remove("saliendo");
+wrap.classList.add("reducido");
+void wrap.offsetWidth;
+wrap.classList.remove("reducido");
+wrap.classList.add("saliendo");
+wrap.addEventListener("transitionend", onEnd);
+temporizador = setTimeout(terminar, 3500);
+} finally {
+animando = false;
+btn.disabled = false;
+}
+}
+
+document.getElementById("btn-imprimir").addEventListener("click", imprimir);
+document.getElementById("btn-reintentar").addEventListener("click", function() {
+if (lineasRecibo.length && ventaId) {
+imprimir();
+} else if (ventaId) {
+cargarRespaldo(ventaId).then(imprimir).catch(function() { estadoError("No se pudo imprimir"); });
+} else {
+location.href = "/vender";
+}
+});
+document.getElementById("btn-nueva").addEventListener("click", function() {
+try { sessionStorage.removeItem("recibo"); } catch (e) {}
+location.href = "/vender";
+});
+document.getElementById("btn-volver").addEventListener("click", function() {
+try { sessionStorage.removeItem("recibo"); } catch (e) {}
+irAtras("/vender");
+});
+
+(async function init() {
+var datos = null;
+try {
+datos = JSON.parse(sessionStorage.getItem("recibo") || "null");
+} catch (e) {}
+
+if (datos && datos.venta && datos.venta.id) {
+armarDesdeDatos(datos);
+if (!lineasRecibo.length) {
+try { await cargarRespaldo(datos.venta.id); } catch (e) {}
+}
+if (!lineasRecibo.length) {
+estadoError("No se pudo imprimir");
+return;
+}
+setEstado("progreso", "Listo para imprimir");
+return;
+}
+
+var idUrl = new URLSearchParams(location.search).get("id");
+if (idUrl) {
+try {
+await cargarRespaldo(idUrl);
+imprimir();
+} catch (e) {
+estadoError("No se pudo imprimir");
+}
+return;
+}
+
+mostrarToast("No hay recibo para mostrar.", true);
+setTimeout(function() { location.href = "/vender"; }, 1200);
+})();
+</script>
+{% endblock %}
