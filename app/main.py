@@ -30,7 +30,9 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Tienda", lifespan=lifespan)
 
 BASE_DIR = config.BASE_DIR
-app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
+STATIC_DIR = BASE_DIR / "static"
+STATIC_DIR.mkdir(parents=True, exist_ok=True)
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 templates = Jinja2Templates(directory=BASE_DIR / "templates")
 
 app.include_router(auth_router)
