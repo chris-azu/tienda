@@ -20,14 +20,14 @@ async def lifespan(app: FastAPI):
         auth.ensure_pin_hash()
     except Exception:
         logger.warning(
-            "No se pudo sembrar el PIN en settings; "
+            "No se pudo sembrar el PIN en tienda_settings; "
             "se reintentara en el primer login.",
             exc_info=True,
         )
     yield
 
 
-app = FastAPI(title="Tienda", lifespan=lifespan)
+app = FastAPI(title="Tienda Joana", lifespan=lifespan)
 
 BASE_DIR = config.BASE_DIR
 STATIC_DIR = BASE_DIR / "static"

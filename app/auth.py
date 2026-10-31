@@ -40,13 +40,13 @@ def verify_pin(pin: str, guardado: str) -> bool:
 
 
 def ensure_pin_hash() -> None:
-    """Si settings.pin_hash esta vacio, lo siembra desde APP_PIN."""
+    """Si tienda_settings.pin_hash esta vacio, lo siembra desde APP_PIN."""
     client = db.get_db()
-    fila = client.table("settings").select("pin_hash").limit(1).execute().data
+    fila = client.table("tienda_settings").select("pin_hash").limit(1).execute().data
     if fila and not fila[0].get("pin_hash"):
-        client.table("settings").update(
+        client.table("tienda_settings").update(
             {"pin_hash": hash_pin(config.APP_PIN)}
-        ).neq("id", 0).execute()
+        ).eq("id", True).execute()
 
 
 def set_session(response: Response) -> None:
@@ -131,7 +131,7 @@ def login(datos: LoginIn, request: Request, response: Response):
     ensure_pin_hash()
     fila = (
         db.get_db()
-        .table("settings")
+        .table("tienda_settings")
         .select("pin_hash")
         .limit(1)
         .execute()

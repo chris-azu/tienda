@@ -1,4 +1,4 @@
-# Tienda
+# Tienda Joana
 
 App web movil para una tienda de barrio: facturacion (venta, cobro, anulacion),
 inventario con alertas de stock bajo y ganancia por venta.

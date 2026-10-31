@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block titulo %}Recibo · Abarrotes La Esquina{% endblock %}
+{% block titulo %}Recibo · Tienda Joana{% endblock %}
 {% block header_titulo %}Recibo{% endblock %}
 {% block volver %}
 <button class="w-11 h-11 -ml-2 rounded-full flex items-center justify-center text-on-surface active:scale-95 transition-transform" id="btn-volver" title="Volver" type="button">
@@ -242,8 +242,7 @@ function construirRecibo() {
 var ticket = "#" + String(ventaId).slice(0, 6).toUpperCase();
 var now = ventaFecha || new Date().toISOString();
 var html =
-'<div class="titulo">Abarrotes La Esquina</div>' +
-'<div class="centro muted">Puesto Express</div>' +
+'<div class="titulo">Tienda Joana</div>' +
 '<div class="centro muted" style="margin-top:2px;">' + fechaLarga(now) + '</div>' +
 '<div class="centro muted">Ticket ' + ticket + '</div>' +
 '<hr class="punteada"/>';
